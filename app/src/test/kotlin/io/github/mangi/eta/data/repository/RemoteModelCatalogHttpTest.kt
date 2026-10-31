@@ -74,12 +74,12 @@ class RemoteModelCatalogHttpTest {
         withServer(listOf(200 to """{"object":"list","data":[
           {"id":"display-key","model":"grok-chat","name":"Grok Chat","context_window":256000,
            "capabilities":{"reasoning_effort":["low","high"],"default_reasoning_effort":"high"}},
-          {"modelId":"grok-explicit-chat","apiBackend":"chat_completions"},
+          {"modelId":"grok-explicit-responses","apiBackend":"responses"},
           {"id":"hidden","hidden":true},
           {"id":"grok-imagine-image","output_modalities":["image"]}
         ]}""")) { url, seen ->
             val result = RemoteModelFetcher.fetchCatalog(provider, redirectedClient(url, targets), credentials).getOrThrow()
-            assertEquals(listOf("grok-chat", "grok-explicit-chat"), result.models.map { it.modelId })
+            assertEquals(listOf("grok-chat", "grok-explicit-responses"), result.models.map { it.modelId })
             assertEquals(256000, result.models.first().contextWindow)
             assertEquals(ReasoningEffort.HIGH, result.models.first().reasoningCapabilities!!.defaultEffort)
             assertEquals("Bearer fixture-old", seen.single().authorization)

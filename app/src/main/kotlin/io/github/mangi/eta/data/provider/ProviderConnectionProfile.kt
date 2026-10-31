@@ -24,7 +24,8 @@ internal enum class ProviderConnectionProfile(
     XAI_GROK(
         ProviderAuthModes.XAI_GROK,
         "https://cli-chat-proxy.grok.com/v1",
-        OpenAiEndpointMode.CHAT_COMPLETIONS,
+        // 订阅代理的模型目录以 api_backend = "responses" 声明可用协议，与官方 CLI 保持一致。
+        OpenAiEndpointMode.RESPONSES,
         ProviderSourceTypes.XAI,
     );
 

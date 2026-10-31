@@ -9,6 +9,9 @@ import okhttp3.Headers
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 internal object ProviderRequestHeaders {
+    /** 已验证可被 cli-chat-proxy 接受的 Grok CLI 协议版本。 */
+    internal const val GROK_CLIENT_VERSION = "1.0.70"
+
     fun mergeInto(
         builder: Headers.Builder,
         baseUrl: String,
@@ -27,6 +30,8 @@ internal object ProviderRequestHeaders {
         CustomHeaderFilter.mergeInto(builder, customHeaders)
         if (profile == ProviderConnectionProfile.XAI_GROK) {
             builder.set("X-XAI-Token-Auth", "xai-grok-cli")
+            // 订阅代理拒绝未声明客户端版本的推理请求（HTTP 426），版本需不低于代理要求的最低 CLI 版本。
+            builder.set("x-grok-client-version", GROK_CLIENT_VERSION)
             model?.let { builder.set("x-grok-model-override", it) }
         }
         if (profile == ProviderConnectionProfile.OPENAI_CODEX) {

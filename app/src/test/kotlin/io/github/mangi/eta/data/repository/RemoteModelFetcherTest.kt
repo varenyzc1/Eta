@@ -20,11 +20,11 @@ class RemoteModelFetcherTest {
             """{"data":[
               {"id":"display-key","model":"actual-model","name":"显示名称","context_window":131072,
                "baseUrl":"https://untrusted.example","apiKey":"secret","extraHeaders":{"Authorization":"secret"}},
-              {"modelId":"second-model","api_backend":"chat_completions"},
+              {"modelId":"second-model","api_backend":"responses"},
               {"_meta":{"model":"meta-model","contextWindow":256000}},
               {"id":"hidden-top","hidden":true},
               {"id":"hidden-meta","_meta":{"hidden":true}},
-              {"id":"responses-model","apiBackend":"responses"},
+              {"id":"chat-model","apiBackend":"chat_completions"},
               {"id":"messages-model","api_backend":"messages"}
             ]}"""
         ) { skipped = it }
@@ -36,15 +36,15 @@ class RemoteModelFetcherTest {
     }
 
     @Test
-    fun grokCatalogKeepsDefaultChatModelsAndDistinguishesIncompatibleFromEmpty() {
+    fun grokCatalogKeepsResponsesModelsAndDistinguishesIncompatibleFromEmpty() {
         val models = RemoteModelFetcher.parseGrokModels(
             """{"object":"list","data":[
               {"id":"grok-build","object":"model","owned_by":"xai","context_length":131072},
-              {"id":"grok-explicit-chat","apiBackend":"chat_completions"}
+              {"id":"grok-explicit-responses","apiBackend":"responses"}
             ]}"""
         )
         assertEquals(2, models.size)
-        for (backend in listOf("responses", "messages", "unknown")) {
+        for (backend in listOf("chat_completions", "messages", "unknown")) {
             val error = assertThrows(IllegalArgumentException::class.java) {
                 RemoteModelFetcher.parseGrokModels("""{"data":[{"id":"model","apiBackend":"$backend"}]}""")
             }
@@ -53,6 +53,38 @@ class RemoteModelFetcherTest {
         assertTrue(RemoteModelFetcher.parseGrokModels("""{"data":[]}""").isEmpty())
         assertTrue(RemoteModelFetcher.parseGrokModels("""{"data":[{"id":"hidden","hidden":true}]}""").isEmpty())
         assertTrue(runCatching { RemoteModelFetcher.parseGrokModels("""{"models":[]}""") }.isFailure)
+    }
+
+    @Test
+    fun grokSubscriptionProxyCatalogImportsResponsesModels() {
+        // 结构取自 cli-chat-proxy 实际返回的 /v1/models：全部模型声明 api_backend = "responses"。
+        val models = RemoteModelFetcher.parseGrokModels(
+            """{"object":"list","data":[
+              {"id":"grok-4.7","object":"model","owned_by":"xAI","model":"grok-4.7","model_family":"xai",
+               "name":"Grok 4.7","context_window":256000,"context_windows":[256000,500000],
+               "api_backend":"responses","reasoning_effort":"high","supports_reasoning_effort":true,
+               "reasoning_efforts":[
+                 {"id":"xhigh","value":"xhigh","default":false},
+                 {"id":"high","value":"high","default":true},
+                 {"id":"medium","value":"medium","default":false},
+                 {"id":"low","value":"low","default":false}
+               ],"supports_backend_search":true},
+              {"id":"grok-4.5","object":"model","owned_by":"xAI","model":"grok-4.5","name":"Grok 4.5",
+               "context_window":256000,"api_backend":"responses","supports_reasoning_effort":true,
+               "reasoning_efforts":[{"value":"high","default":true},{"value":"medium"},{"value":"low"}]}
+            ]}"""
+        )
+        assertEquals(listOf("grok-4.7", "grok-4.5"), models.map { it.modelId })
+        val first = models.first()
+        assertEquals("Grok 4.7", first.displayName)
+        assertEquals(256000, first.contextWindow)
+        val reasoning = first.reasoningCapabilities!!
+        assertEquals(
+            listOf(ReasoningEffort.XHIGH, ReasoningEffort.HIGH, ReasoningEffort.MEDIUM, ReasoningEffort.LOW),
+            reasoning.supportedEfforts,
+        )
+        assertEquals(ReasoningEffort.HIGH, reasoning.defaultEffort)
+        assertTrue(reasoning.mandatory)
     }
 
     @Test

@@ -22,7 +22,7 @@ class ProviderRequestHeadersTest {
     }
 
     @Test
-    fun grokSubscriptionUsesManagedRoutingWithoutPretendingToBeAClientVersion() {
+    fun grokSubscriptionUsesManagedRoutingAndDeclaresRequiredClientVersion() {
         val builder = Headers.Builder()
         ProviderRequestHeaders.mergeInto(
             builder, "https://cli-chat-proxy.grok.com/v1", emptyList(),
@@ -32,7 +32,8 @@ class ProviderRequestHeadersTest {
         assertEquals("xai-grok-cli", headers["X-XAI-Token-Auth"])
         assertEquals("grok-fixture", headers["x-grok-model-override"])
         assertEquals("Eta", headers["User-Agent"])
-        assertNull(headers["x-grok-client-version"])
+        // 未声明版本时代理返回 HTTP 426，要求升级 CLI。
+        assertEquals(ProviderRequestHeaders.GROK_CLIENT_VERSION, headers["x-grok-client-version"])
     }
 
     @Test

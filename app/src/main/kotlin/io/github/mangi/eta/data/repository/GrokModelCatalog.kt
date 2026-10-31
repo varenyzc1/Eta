@@ -13,6 +13,9 @@ import kotlinx.serialization.json.intOrNull
 
 /** Grok 目录中的展示标识、推理标识和协议声明独立于通用 OpenAI 模型目录。 */
 internal object GrokModelCatalog {
+    /** 订阅连接固定使用的模型协议，对应目录项的 api_backend 声明。 */
+    private const val SUPPORTED_BACKEND = "responses"
+
     fun parse(
         entries: JsonArray,
         decode: (JsonObject) -> Model,
@@ -27,7 +30,7 @@ internal object GrokModelCatalog {
             visible++
             val backend = item["apiBackend"] ?: item["api_backend"]
             if (backend != null && backend != JsonNull &&
-                (backend as? JsonPrimitive)?.takeIf { it.isString }?.content != "chat_completions"
+                (backend as? JsonPrimitive)?.takeIf { it.isString }?.content != SUPPORTED_BACKEND
             ) {
                 unsupported++
                 return@mapIndexedNotNull null

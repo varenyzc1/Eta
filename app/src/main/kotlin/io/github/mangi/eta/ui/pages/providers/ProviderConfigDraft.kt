@@ -43,7 +43,8 @@ internal data class ProviderConfigDraft(
             authMode = provider.authMode,
             systemPrompt = provider.systemPrompt.orEmpty(),
             isEnabled = provider.isEnabled,
-            endpointMode = when (provider) {
+            // 订阅连接的协议由连接配置固定，旧版本保存的协议值不再生效。
+            endpointMode = ProviderConnectionProfile.forAuthMode(provider.authMode)?.endpointMode ?: when (provider) {
                 is OpenAiCompatibleProviderSetting -> provider.endpointMode
                 is CustomProviderSetting -> provider.endpointMode
                 is AnthropicProviderSetting, is GeminiProviderSetting -> ""

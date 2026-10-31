@@ -1,5 +1,6 @@
 package io.github.mangi.eta.agent.model
 
+import io.github.mangi.eta.data.model.ProviderAuthModes
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -10,7 +11,11 @@ internal object ResponsesRequestBuilder {
         tools: JSONArray,
     ): JSONObject {
         val input = buildInput(messages)
-        val responseTools = buildTools(tools, config.usesHostedWebSearch)
+        val responseTools = buildTools(
+            tools,
+            config.usesHostedWebSearch,
+            stripTopLevelCombinators = config.authMode == ProviderAuthModes.XAI_GROK,
+        )
         val instructions = OpenAiRequestMessages.responsesInstructions(messages)
             .ifBlank { config.systemPrompt }
         val request = JSONObject()
@@ -109,7 +114,11 @@ internal object ResponsesRequestBuilder {
         }
     }
 
-    private fun buildTools(tools: JSONArray, hostedWebSearchEnabled: Boolean): JSONArray =
+    private fun buildTools(
+        tools: JSONArray,
+        hostedWebSearchEnabled: Boolean,
+        stripTopLevelCombinators: Boolean,
+    ): JSONArray =
         JSONArray().also { result ->
             for (index in 0 until tools.length()) {
                 val function = tools.optJSONObject(index)?.optJSONObject("function") ?: continue
@@ -119,12 +128,24 @@ internal object ResponsesRequestBuilder {
                         .put("type", "function")
                         .put("name", function.optString("name"))
                         .put("description", function.optString("description"))
-                        .put("parameters", deepCopy(function.opt("parameters") ?: JSONObject()))
+                        .put("parameters", parameters(function.opt("parameters"), stripTopLevelCombinators))
                         .put("strict", false),
                 )
             }
             if (hostedWebSearchEnabled) result.put(JSONObject().put("type", "web_search"))
         }
+
+    /**
+     * Grok 订阅代理要求参数根节点是纯 object，根部 oneOf/anyOf/allOf 会让整个请求 400
+     * （invalid_client_tool_schema）。只在发送副本上移除，互斥约束仍由工具执行时校验。
+     */
+    private fun parameters(raw: Any?, stripTopLevelCombinators: Boolean): Any {
+        val copy = deepCopy(raw ?: JSONObject())
+        if (stripTopLevelCombinators && copy is JSONObject) TOP_LEVEL_COMBINATORS.forEach(copy::remove)
+        return copy
+    }
+
+    private val TOP_LEVEL_COMBINATORS = listOf("oneOf", "anyOf", "allOf")
 
     private fun mergeExtraBody(request: JSONObject, extraBodyJson: String) {
         if (extraBodyJson.isBlank()) return
